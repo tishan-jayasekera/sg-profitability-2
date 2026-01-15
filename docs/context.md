@@ -15,6 +15,7 @@ The pipeline cleans keys, aggregates each sheet, allocates job-month revenue to 
   - revenue: `Month` (already first-of-month).
   - timesheet: `Month Key` (already first-of-month).
 - Task mapping: optional overrides in `config/task_name_map.csv` with `job_no` (optional), `from_task`, `to_task`. Mapping is applied before joins. Fuzzy matching suggestions are generated for QA but not auto-applied.
+- Department mapping: optional overrides in `config/department_map.csv` with `from_dept`, `to_dept` applied to both actual and quote departments before comparison.
 
 ## Revenue Aggregation
 - Filter out rows where `Excluded` is truthy (values in `config/settings.yaml`).
@@ -31,7 +32,8 @@ The pipeline cleans keys, aggregates each sheet, allocates job-month revenue to 
   - total_cost
   - weighted avg base/billable rates
   - distinct staff count
-- Dimension columns (Department, Function, Category, Role, Task, Deliverable) use mode; if multiple distinct values are present, a `mixed_dimension_*` flag is raised.
+- Department is derived as the hours-weighted mode (`department_actual`) per task-month with `mixed_department` and top-share diagnostics.
+- Other dimension columns (Function, Category, Role, Task, Deliverable) use hours-weighted mode with `mixed_dimension_*` flags.
 
 ## Revenue Allocation
 For each job-month:
@@ -48,10 +50,14 @@ Aggregate quotation rows by `(job_no, task_name)`:
 Grain: `(job_no, task_name, month_key)`
 - `revenue_allocated` and `total_cost` to compute `gross_profit` and `margin`.
 - Quote fields joined at job-task level:
-- `is_unquoted_task` when no quote match.
-- `is_unworked_task` when quote exists but no timesheet.
-- `is_unallocated_row` for the synthetic allocation row.
+  - `is_unquoted_task` when no quote match.
+  - `is_unworked_task` when quote exists but no timesheet.
+  - `is_unallocated_row` for the synthetic allocation row.
 - For quoted tasks with no timesheet rows, a synthetic row is added with `month_key` as null.
+- Department reconciliation:
+  - `department_actual` from timesheet and `department_quote` from quote.
+  - `department_reporting` uses actual if present, else quote.
+  - `dept_match_status` flags MATCH/MISMATCH and missing/quote-only/actual-only cases.
 
 ## QA Checks
 - Per job-month: sum of `revenue_allocated` equals `revenue_monthly` within tolerance.

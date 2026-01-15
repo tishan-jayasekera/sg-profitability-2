@@ -46,6 +46,8 @@ if _flag_col("is_unallocated_row"):
     mask = mask | filtered_fact["is_unallocated_row"]
 if _flag_col("is_unquoted_task"):
     mask = mask | filtered_fact["is_unquoted_task"]
+if _flag_col("dept_match_status"):
+    mask = mask | filtered_fact["dept_match_status"].eq("MISMATCH")
 
 flags = filtered_fact[mask] if mask is not False else filtered_fact.iloc[0:0]
 

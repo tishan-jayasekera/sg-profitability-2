@@ -5,7 +5,7 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 
-from src.utils import coalesce
+from src.utils import coalesce, standardize_department
 
 
 def _col(df: pd.DataFrame, name: str) -> pd.Series:
@@ -60,11 +60,28 @@ def build_fact_table(
     merged["quote_amount_variance"] = merged["revenue_allocated"] - merged["quote_amount_allocated"]
 
     merged["is_unallocated_row"] = merged.get("is_unallocated_row", False)
+    merged["is_quote_only_task"] = merged.get("is_quote_only_task", False)
     merged["is_unworked_task"] = (merged["quoted_time"] > 0) & (merged["total_hours"] <= 0)
+    merged["is_actual_only_task"] = merged["is_unquoted_task"] & (merged["total_hours"] > 0)
 
     merged["client"] = coalesce(_col(merged, "client"), _col(merged, "Client"))
     merged["category"] = coalesce(_col(merged, "job_category"), _col(merged, "Category"), _col(merged, "category"))
-    merged["department"] = coalesce(_col(merged, "department"), _col(merged, "Department"))
+    merged["department_actual"] = _col(merged, "department_actual")
+    merged["department_quote"] = _col(merged, "department_quote")
+    merged["department_reporting"] = coalesce(merged["department_actual"], merged["department_quote"])
+
+    actual_norm = merged["department_actual"].apply(standardize_department)
+    quote_norm = merged["department_quote"].apply(standardize_department)
+
+    merged["dept_match_flag"] = (actual_norm != "") & (quote_norm != "") & (actual_norm == quote_norm)
+    merged["dept_match_status"] = "MISSING_ACTUAL_DEPT"
+    merged.loc[(actual_norm != "") & (quote_norm == ""), "dept_match_status"] = "MISSING_QUOTE_DEPT"
+    merged.loc[(actual_norm != "") & (quote_norm != "") & (actual_norm == quote_norm), "dept_match_status"] = "MATCH"
+    merged.loc[(actual_norm != "") & (quote_norm != "") & (actual_norm != quote_norm), "dept_match_status"] = "MISMATCH"
+    merged.loc[merged["is_quote_only_task"], "dept_match_status"] = "QUOTE_ONLY_TASK"
+    merged.loc[merged["is_actual_only_task"], "dept_match_status"] = "ACTUAL_ONLY_TASK"
+
+    merged["department"] = merged["department_reporting"]
 
     return merged
 

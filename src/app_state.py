@@ -52,6 +52,7 @@ def get_data(
             settings_path: str,
             input_mtime: float,
             map_mtime: float,
+            dept_map_mtime: float,
         ) -> Dict[str, pd.DataFrame]:
             logger.info("Rebuilding datasets from Excel")
             result = build_dataset(
@@ -71,6 +72,7 @@ def get_data(
             }
 
         map_path = Path("config/task_name_map.csv")
+        dept_map_path = Path(settings.get("department_map_path", "config/department_map.csv"))
         data = _build_cached(
             input_path=str(excel_path),
             fy=fy,
@@ -78,6 +80,7 @@ def get_data(
             settings_path=settings_path,
             input_mtime=excel_path.stat().st_mtime,
             map_mtime=map_path.stat().st_mtime if map_path.exists() else 0.0,
+            dept_map_mtime=dept_map_path.stat().st_mtime if dept_map_path.exists() else 0.0,
         )
         return data
 
@@ -127,7 +130,13 @@ def sidebar_filters(fact: pd.DataFrame, base: Dict[str, object]) -> Dict[str, ob
         max_value=max_month.date(),
     )
 
-    department_options = sorted({d for d in fact.get("department", pd.Series(dtype=str)).dropna().unique() if d != ""})
+    dept_reporting = set(
+        d for d in fact.get("department_reporting", pd.Series(dtype=str)).dropna().unique() if d != ""
+    )
+    dept_quote = set(
+        d for d in fact.get("department_quote", pd.Series(dtype=str)).dropna().unique() if d != ""
+    )
+    department_options = sorted(dept_reporting.union(dept_quote))
     client_options = sorted({c for c in fact.get("client", pd.Series(dtype=str)).dropna().unique() if c != ""})
     category_options = sorted({c for c in fact.get("category", pd.Series(dtype=str)).dropna().unique() if c != ""})
     job_options = sorted({j for j in fact["job_no"].dropna().unique() if j != ""})
@@ -137,6 +146,8 @@ def sidebar_filters(fact: pd.DataFrame, base: Dict[str, object]) -> Dict[str, ob
     categories = st.sidebar.multiselect("Category", category_options)
     jobs = st.sidebar.multiselect("Job No", job_options)
 
+    use_quote_department = st.sidebar.checkbox("Use Quote Department instead", value=False)
+    show_only_mismatch = st.sidebar.checkbox("Show only dept mismatches", value=False)
     billable_only = st.sidebar.checkbox("Billable-only", value=False)
     onshore_only = st.sidebar.checkbox("Onshore-only", value=False)
 
@@ -151,6 +162,8 @@ def sidebar_filters(fact: pd.DataFrame, base: Dict[str, object]) -> Dict[str, ob
         "clients": clients,
         "categories": categories,
         "jobs": jobs,
+        "use_quote_department": use_quote_department,
+        "show_only_mismatch": show_only_mismatch,
         "billable_only": billable_only,
         "onshore_only": onshore_only,
     }
@@ -165,8 +178,9 @@ def apply_filters(fact: pd.DataFrame, filters: Dict[str, object]) -> pd.DataFram
     )
     filtered = filtered[month_mask]
 
-    if filters["departments"]:
-        filtered = filtered[filtered["department"].isin(filters["departments"])]
+    department_col = "department_quote" if filters.get("use_quote_department") else "department_reporting"
+    if filters["departments"] and department_col in filtered.columns:
+        filtered = filtered[filtered[department_col].isin(filters["departments"])]
     if filters["clients"]:
         filtered = filtered[filtered["client"].isin(filters["clients"])]
     if filters["categories"]:
@@ -177,5 +191,7 @@ def apply_filters(fact: pd.DataFrame, filters: Dict[str, object]) -> pd.DataFram
         filtered = filtered[filtered["billable_hours"] > 0]
     if filters["onshore_only"]:
         filtered = filtered[filtered["onshore_hours"] > 0]
+    if filters.get("show_only_mismatch") and "dept_match_status" in filtered.columns:
+        filtered = filtered[filtered["dept_match_status"] == "MISMATCH"]
 
     return filtered

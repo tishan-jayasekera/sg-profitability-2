@@ -7,7 +7,14 @@ from typing import Dict, Optional, Tuple
 import pandas as pd
 
 from src import allocation, io, metrics, qa, quotation, revenue, timesheet
-from src.utils import get_logger, load_settings, read_task_name_map, write_json
+from src.utils import (
+    apply_department_map,
+    get_logger,
+    load_settings,
+    read_department_map,
+    read_task_name_map,
+    write_json,
+)
 
 
 @dataclass
@@ -34,6 +41,7 @@ def build_dataset(
 
     sheets = io.read_excel_sheets(input_path)
     task_map = read_task_name_map("config/task_name_map.csv")
+    department_map = read_department_map(settings.get("department_map_path", "config/department_map.csv"))
 
     revenue_monthly, revenue_qa = revenue.aggregate_revenue(
         sheets[io.SHEET_REVENUE], settings["exclusions"]["truthy_values"]
@@ -46,6 +54,15 @@ def build_dataset(
     quote_task, quote_qa = quotation.aggregate_quotation(
         sheets[io.SHEET_QUOTATION], task_map
     )
+
+    if "department_actual" in timesheet_task_month.columns:
+        timesheet_task_month["department_actual"] = apply_department_map(
+            timesheet_task_month["department_actual"], department_map
+        )
+    if "department_quote" in quote_task.columns:
+        quote_task["department_quote"] = apply_department_map(
+            quote_task["department_quote"], department_map
+        )
 
     if not include_all_history:
         start = pd.to_datetime(settings["months"]["fy26_start"])
@@ -81,6 +98,7 @@ def build_dataset(
         synth["revenue_monthly"] = 0.0
         synth["revenue_allocated"] = 0.0
         synth["is_unallocated_row"] = False
+        synth["is_quote_only_task"] = True
         for col in allocated.columns:
             if col not in synth.columns:
                 synth[col] = None

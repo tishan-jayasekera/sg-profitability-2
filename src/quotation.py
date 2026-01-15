@@ -5,7 +5,7 @@ from typing import Dict, Tuple
 import pandas as pd
 
 from src.clean import add_quotation_keys
-from src.utils import get_logger, safe_to_numeric
+from src.utils import get_logger, safe_to_numeric, standardize_department
 
 
 META_COLUMNS = {
@@ -15,7 +15,7 @@ META_COLUMNS = {
     "job_status": "[Job] Status",
     "job_start_date": "[Job] Start Date",
     "job_completed_date": "[Job] Completed Date",
-    "department": "Department",
+    "department_quote": "department_quote",
     "product": "Product",
 }
 
@@ -41,6 +41,8 @@ def aggregate_quotation(df: pd.DataFrame, map_df: pd.DataFrame | None = None) ->
     df["invoiced_time"] = safe_to_numeric(df.get("[Job Task] Invoiced Time", pd.Series(dtype=float))).fillna(0)
     df["invoiced_amount"] = safe_to_numeric(df.get("[Job Task] Invoiced Amount", pd.Series(dtype=float))).fillna(0)
 
+    df["department_quote"] = df.get("Department", pd.Series(dtype=str)).apply(standardize_department)
+
     agg_map = {
         "quoted_time": "sum",
         "quoted_amount": "sum",
@@ -58,6 +60,15 @@ def aggregate_quotation(df: pd.DataFrame, map_df: pd.DataFrame | None = None) ->
         .agg(agg_map)
         .reset_index()
     )
+
+    quote_dept_counts = (
+        df.groupby(["job_no", "task_name"], dropna=False)["department_quote"]
+        .nunique()
+        .reset_index()
+        .rename(columns={"department_quote": "quote_mixed_department"})
+    )
+    quote_dept_counts["quote_mixed_department"] = quote_dept_counts["quote_mixed_department"] > 1
+    grouped = grouped.merge(quote_dept_counts, on=["job_no", "task_name"], how="left")
 
     rename_map = {v: k for k, v in META_COLUMNS.items() if v in grouped.columns}
     grouped = grouped.rename(columns=rename_map)

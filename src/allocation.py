@@ -42,6 +42,7 @@ def allocate_revenue(
         base.loc[has_hours, "total_hours"] / base.loc[has_hours, "total_hours_job_month"]
     )
     base["revenue_allocated"] = base["task_share"] * base["revenue_monthly"]
+    base["is_quote_only_task"] = False
 
     revenue_only = revenue.merge(total_hours, on=["job_no", "month_key"], how="left")
     revenue_only["total_hours_job_month"] = revenue_only["total_hours_job_month"].fillna(0)

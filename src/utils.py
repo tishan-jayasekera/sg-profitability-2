@@ -56,6 +56,11 @@ def standardize_task_name(value: Any) -> str:
     return normalize_whitespace(value)
 
 
+def standardize_department(value: Any) -> str:
+    """Standardize department values for matching."""
+    return normalize_whitespace(value).upper()
+
+
 def truthy_flag(value: Any, truthy_values: Iterable[Any]) -> bool:
     """Evaluate whether a value should be treated as truthy by configuration."""
     if value is None or (isinstance(value, float) and np.isnan(value)):
@@ -95,6 +100,25 @@ def read_task_name_map(path: str | Path) -> pd.DataFrame:
     if not Path(path).exists():
         return pd.DataFrame(columns=["job_no", "from_task", "to_task"])
     return pd.read_csv(path, dtype=str).fillna("")
+
+
+def read_department_map(path: str | Path) -> pd.DataFrame:
+    """Load department mapping configuration."""
+    if not Path(path).exists():
+        return pd.DataFrame(columns=["from_dept", "to_dept"])
+    return pd.read_csv(path, dtype=str).fillna("")
+
+
+def apply_department_map(values: pd.Series, map_df: pd.DataFrame) -> pd.Series:
+    """Apply department mapping to a Series."""
+    if map_df is None or map_df.empty:
+        return values
+    mapping = {
+        standardize_department(row["from_dept"]): standardize_department(row["to_dept"])
+        for _, row in map_df.iterrows()
+        if row["from_dept"]
+    }
+    return values.apply(lambda v: mapping.get(standardize_department(v), standardize_department(v)))
 
 
 def apply_task_name_map(
