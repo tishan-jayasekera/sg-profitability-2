@@ -1,0 +1,15 @@
+fy_default: FY26
+include_all_history_default: false
+processed_dir: data/processed
+raw_input_default: data/raw/Quoted_Task_Report_FY26.xlsx
+allocation:
+  unallocated_task_name: __UNALLOCATED__
+  revenue_tolerance: 1.0e-6
+exclusions:
+  truthy_values: ["Y", "YES", "TRUE", "1", 1, true]
+months:
+  fy26_start: 2025-07-01
+  fy26_end: 2026-01-31
+qa:
+  negative_hours_floor: 0.0
+  min_hours_for_rate_weight: 0.000001
