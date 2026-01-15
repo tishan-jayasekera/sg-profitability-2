@@ -78,6 +78,12 @@ def apply_filters(
 
 
 def compute_reconciliation_totals(df: pd.DataFrame, recon: Dict[str, int]) -> Dict[str, object]:
+    if "quoted_hours" not in df.columns and "quoted_time" in df.columns:
+        df = df.copy()
+        df["quoted_hours"] = df["quoted_time"]
+    if "actual_hours" not in df.columns and "total_hours" in df.columns:
+        df = df.copy()
+        df["actual_hours"] = df["total_hours"]
     recon["totals"] = {
         "sum_quoted_hours": float(df["quoted_hours"].sum()),
         "sum_actual_hours": float(df["actual_hours"].sum()),
@@ -602,4 +608,21 @@ def prepare_fact_for_analysis(fact: pd.DataFrame) -> pd.DataFrame:
     df["job_name"] = df.get("job_name", "")
     df["client"] = df.get("client", "")
     df["job_status"] = df.get("job_status", "")
+    if "quoted_hours" not in df.columns and "quoted_time" in df.columns:
+        df["quoted_hours"] = df["quoted_time"]
+    if "actual_hours" not in df.columns and "total_hours" in df.columns:
+        df["actual_hours"] = df["total_hours"]
+    if "quoted_amount" not in df.columns:
+        df["quoted_amount"] = df.get("quoted_amount", 0)
+    if "billable_rate_hr" not in df.columns:
+        df["billable_rate_hr"] = df.get("avg_billable_rate", 0)
+    if "cost_rate_hr" not in df.columns:
+        df["cost_rate_hr"] = df.get("avg_base_rate", 0)
+    if "billable_value" not in df.columns:
+        df["billable_value"] = df.get("billable_amount_actual", 0)
+    if "expected_quote" not in df.columns:
+        expected_rate = df["billable_rate_hr"].where(df["billable_rate_hr"] > 0, 0)
+        df["expected_quote"] = df["quoted_hours"] * expected_rate
+    if "quote_gap" not in df.columns:
+        df["quote_gap"] = df["quoted_amount"] - df["expected_quote"]
     return df
