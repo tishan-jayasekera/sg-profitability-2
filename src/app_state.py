@@ -39,22 +39,47 @@ def get_data(
     logger = get_logger()
 
     if data_source == "Rebuild from Excel":
-        logger.info("Rebuilding datasets from Excel")
-        result = build_dataset(
-            input_path=input_path,
+        excel_path = Path(input_path)
+        if not excel_path.exists():
+            st.error(f"Excel file not found: {excel_path}")
+            st.stop()
+
+        @st.cache_data(show_spinner=True)
+        def _build_cached(
+            input_path: str,
+            fy: str,
+            include_all_history: bool,
+            settings_path: str,
+            input_mtime: float,
+            map_mtime: float,
+        ) -> Dict[str, pd.DataFrame]:
+            logger.info("Rebuilding datasets from Excel")
+            result = build_dataset(
+                input_path=input_path,
+                fy=fy,
+                include_all_history=include_all_history,
+                settings_path=settings_path,
+            )
+            return {
+                "revenue_monthly": result.revenue_monthly,
+                "timesheet_task_month": result.timesheet_task_month,
+                "quote_task": result.quote_task,
+                "fact": result.fact,
+                "job_month_summary": result.job_month_summary,
+                "job_total_summary": result.job_total_summary,
+                "quote_vs_actual_summary": result.quote_vs_actual_summary,
+            }
+
+        map_path = Path("config/task_name_map.csv")
+        data = _build_cached(
+            input_path=str(excel_path),
             fy=fy,
             include_all_history=include_all_history,
             settings_path=settings_path,
+            input_mtime=excel_path.stat().st_mtime,
+            map_mtime=map_path.stat().st_mtime if map_path.exists() else 0.0,
         )
-        return {
-            "revenue_monthly": result.revenue_monthly,
-            "timesheet_task_month": result.timesheet_task_month,
-            "quote_task": result.quote_task,
-            "fact": result.fact,
-            "job_month_summary": result.job_month_summary,
-            "job_total_summary": result.job_total_summary,
-            "quote_vs_actual_summary": result.quote_vs_actual_summary,
-        }
+        return data
 
     try:
         return load_processed(processed_dir)
