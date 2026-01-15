@@ -59,7 +59,8 @@ def get_data(
     try:
         return load_processed(processed_dir)
     except FileNotFoundError:
-        st.error(\"Processed data not found. Run the build script or choose 'Rebuild from Excel'.\")\n        st.stop()
+        st.error("Processed data not found. Run the build script or choose 'Rebuild from Excel'.")
+        st.stop()
 
 
 def sidebar_base_controls(settings_path: str = "config/settings.yaml") -> Dict[str, object]:
