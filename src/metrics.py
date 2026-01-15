@@ -8,6 +8,12 @@ import pandas as pd
 from src.utils import coalesce
 
 
+def _col(df: pd.DataFrame, name: str) -> pd.Series:
+    if name in df.columns:
+        return df[name]
+    return pd.Series([None] * len(df))
+
+
 def build_fact_table(
     allocated: pd.DataFrame,
     quote_task: pd.DataFrame,
@@ -56,9 +62,9 @@ def build_fact_table(
     merged["is_unallocated_row"] = merged.get("is_unallocated_row", False)
     merged["is_unworked_task"] = (merged["quoted_time"] > 0) & (merged["total_hours"] <= 0)
 
-    merged["client"] = coalesce(merged.get("client"), merged.get("Client"))
-    merged["category"] = coalesce(merged.get("job_category"), merged.get("Category"), merged.get("category"))
-    merged["department"] = coalesce(merged.get("department"), merged.get("Department"))
+    merged["client"] = coalesce(_col(merged, "client"), _col(merged, "Client"))
+    merged["category"] = coalesce(_col(merged, "job_category"), _col(merged, "Category"), _col(merged, "category"))
+    merged["department"] = coalesce(_col(merged, "department"), _col(merged, "Department"))
 
     return merged
 

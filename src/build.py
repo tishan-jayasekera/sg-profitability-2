@@ -120,6 +120,11 @@ def build_dataset(
 
     write_json(processed_dir / "qa_report.json", qa_report)
 
+    if not qa_report.get("allocation_ok", True):
+        raise ValueError("Revenue allocation check failed. See QA report for details.")
+    if not qa_report.get("unique_keys_ok", True):
+        raise ValueError("Fact table key uniqueness check failed.")
+
     logger.info("Build completed for %s", fy)
 
     return BuildResult(

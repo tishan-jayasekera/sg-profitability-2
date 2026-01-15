@@ -48,9 +48,10 @@ Aggregate quotation rows by `(job_no, task_name)`:
 Grain: `(job_no, task_name, month_key)`
 - `revenue_allocated` and `total_cost` to compute `gross_profit` and `margin`.
 - Quote fields joined at job-task level:
-  - `is_unquoted_task` when no quote match.
-  - `is_unworked_task` when quote exists but no timesheet.
-  - `is_unallocated_row` for the synthetic allocation row.
+- `is_unquoted_task` when no quote match.
+- `is_unworked_task` when quote exists but no timesheet.
+- `is_unallocated_row` for the synthetic allocation row.
+- For quoted tasks with no timesheet rows, a synthetic row is added with `month_key` as null.
 
 ## QA Checks
 - Per job-month: sum of `revenue_allocated` equals `revenue_monthly` within tolerance.
