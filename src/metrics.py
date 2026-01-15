@@ -83,6 +83,50 @@ def build_fact_table(
 
     merged["department"] = merged["department_reporting"]
 
+    merged["product"] = coalesce(_col(merged, "product"), _col(merged, "Product"))
+    merged["job_name"] = coalesce(_col(merged, "job_name"), _col(merged, "[Job] Name"))
+    merged["job_status"] = coalesce(_col(merged, "job_status"), _col(merged, "[Job] Status"))
+
+    merged["actual_hours"] = merged["total_hours"]
+    merged["quoted_hours"] = merged["quoted_time"]
+    merged["quoted_amount"] = merged["quoted_amount"]
+    merged["cost_rate_hr"] = _col(merged, "avg_base_rate").fillna(0)
+    merged["billable_rate_hr"] = _col(merged, "avg_billable_rate").fillna(0)
+    merged["quoted_rate_hr"] = np.where(
+        merged["quoted_hours"] > 0, merged["quoted_amount"] / merged["quoted_hours"], 0
+    )
+    merged["effective_rate_hr"] = np.where(
+        merged["actual_hours"] > 0, merged["quoted_amount"] / merged["actual_hours"], 0
+    )
+    merged["billable_value"] = _col(merged, "billable_amount_actual").fillna(0)
+    merged.loc[merged["billable_value"] == 0, "billable_value"] = (
+        merged["actual_hours"] * merged["billable_rate_hr"]
+    )
+
+    expected_rate = merged["billable_rate_hr"].where(merged["billable_rate_hr"] > 0, merged["quoted_rate_hr"])
+    merged["expected_quote"] = merged["quoted_hours"] * expected_rate
+    merged["quote_gap"] = merged["quoted_amount"] - merged["expected_quote"]
+    merged["quote_gap_pct"] = np.where(
+        merged["expected_quote"] > 0, merged["quote_gap"] / merged["expected_quote"] * 100, 0
+    )
+
+    merged["quoted_margin"] = merged["quoted_amount"] - merged["total_cost"]
+    merged["actual_margin"] = merged["billable_value"] - merged["total_cost"]
+    merged["margin_variance"] = merged["actual_margin"] - merged["quoted_margin"]
+    merged["quoted_margin_pct"] = np.where(
+        merged["quoted_amount"] > 0, merged["quoted_margin"] / merged["quoted_amount"] * 100, 0
+    )
+    merged["billable_margin_pct"] = np.where(
+        merged["billable_value"] > 0, merged["actual_margin"] / merged["billable_value"] * 100, 0
+    )
+
+    merged["hours_variance"] = merged["actual_hours"] - merged["quoted_hours"]
+    merged["hours_variance_pct"] = np.where(
+        merged["quoted_hours"] > 0, merged["hours_variance"] / merged["quoted_hours"] * 100, 0
+    )
+    merged["margin_erosion_rate"] = merged["billable_rate_hr"] - merged["effective_rate_hr"]
+    merged["margin_erosion"] = merged["margin_erosion_rate"] * merged["actual_hours"]
+
     return merged
 
 
